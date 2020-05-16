@@ -198,6 +198,7 @@ func (c ChatBot) messageHandlerWorker(updates chan tgbotapi.Update) {
 							chatID, err := strconv.ParseInt(message.Text, 10, 64)
 							if err == nil {
 								settings.ForwardMessageToChatID = chatID
+								c.forwardToChatID = settings.ForwardMessageToChatID
 							} else {
 								c.logger.Error().Err(err).Send()
 							}
@@ -262,14 +263,34 @@ func (c ChatBot) forward(message *tgbotapi.Message) error {
 		c.botClient.Send(tgbotapi.NewMessage(message.Chat.ID, "forward failed...try again?"))
 		return err
 	}
-	sendm, err := c.botClient.Send(tgbotapi.NewForward(c.forwardToChatID, message.Chat.ID, message.MessageID))
+	settings, err := c.storage.GetSettings(context.Background())
 	if err != nil {
 		c.logger.Error().Err(err).Send()
-		return err
+	} else {
+		c.forwardToChatID = settings.ForwardMessageToChatID
+		sendm, err := c.botClient.Send(tgbotapi.NewForward(c.forwardToChatID, message.Chat.ID, message.MessageID))
+		if err != nil {
+			c.logger.Error().Err(err).
+				Int64("forwardToChatID", c.forwardToChatID).
+				Int64("originChatID", message.Chat.ID).
+				Int("MessageID", message.MessageID).
+				Send()
+			return err
+		}
+		msg.ForwardID = sendm.MessageID
+		msg.Status = "forward"
+		err = c.storage.UpdateMessageStatus(context.Background(), docRef, msg)
+		if err != nil {
+			c.logger.Error().Err(err).Send()
+		}
+		_, err = c.botClient.Send(tgbotapi.MessageConfig{
+			BaseChat: tgbotapi.BaseChat{
+				ChatID:           message.Chat.ID,
+				ReplyToMessageID: message.MessageID,
+			},
+			Text: settings.Thanks,
+		})
 	}
-	msg.ForwardID = sendm.MessageID
-	msg.Status = "forward"
-	err = c.storage.UpdateMessageStatus(context.Background(), docRef, msg)
 	return err
 }
 
@@ -280,7 +301,7 @@ func (c ChatBot) reply(message *tgbotapi.Message) (err error) {
 		c.botClient.Send(tgbotapi.NewMessage(message.Chat.ID, "can not found source message"))
 		return
 	}
-	_, err = c.botClient.Send(tgbotapi.NewForward(originmsg.ChatID, message.Chat.ID, message.MessageID))
+	_, err = c.botClient.Send(tgbotapi.NewMessage(originmsg.ChatID, message.Text))
 	if err != nil {
 		c.logger.Error().Err(err).Send()
 		c.botClient.Send(tgbotapi.NewMessage(message.Chat.ID, "reply message failed"))

@@ -201,22 +201,29 @@ func (s Storage) SaveSettings(ctx context.Context, settings Settings) (err error
 		}
 		var batch = client.Batch()
 		var updates []firestore.Update
+		var needupdate bool = false
 		if oldSettings.BotInfo != settings.BotInfo {
 			updates = append(updates, firestore.Update{Path: "bot_info", Value: settings.BotInfo})
+			needupdate = true
 		}
 		if oldSettings.WelcomeWords != settings.WelcomeWords {
 			updates = append(updates, firestore.Update{Path: "welcome_words", Value: settings.WelcomeWords})
+			needupdate = true
 		}
 		if oldSettings.Thanks != settings.Thanks {
 			updates = append(updates, firestore.Update{Path: "thanks", Value: settings.Thanks})
+			needupdate = true
 		}
 		if oldSettings.ForwardMessageToChatID != settings.ForwardMessageToChatID {
 			updates = append(updates, firestore.Update{Path: "forward_message_to_chat_id", Value: settings.ForwardMessageToChatID})
+			needupdate = true
 		}
-		batch.Update(docRef, updates)
-		_, err = batch.Commit(ctx)
-		if err != nil {
-			s.logger.Error().Err(err).Send()
+		if needupdate {
+			batch.Update(docRef, updates)
+			_, err = batch.Commit(ctx)
+			if err != nil {
+				s.logger.Error().Err(err).Send()
+			}
 		}
 	} else {
 		err = errors.New("settings not found")
