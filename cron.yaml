@@ -1,0 +1,4 @@
+cron:
+- description: "clean old forwarded messages job"
+  url: /cron/clearmessages
+  schedule: every 2 hours synchronized

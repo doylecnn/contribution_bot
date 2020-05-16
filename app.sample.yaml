@@ -1,0 +1,10 @@
+runtime: go113
+
+env_variables:
+  BOT_TOKEN: 'bot token'
+  BOT_ADMIN: 'admin tg id'
+  PROJECT_ID: 'gae project id'
+  DOMAIN: 'gae project domain'
+
+main: ./cmd
+  
